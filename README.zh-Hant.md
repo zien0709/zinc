@@ -26,6 +26,8 @@
 
 需要 **Python 3.10 以上** 和 **cloudflared**。
 
+### 方式 1：pip（PyPI）
+
 ```bash
 # 1) cloudflared（Cloudflare 的隧道程式）
 #    macOS:   brew install cloudflared
@@ -37,14 +39,34 @@ pip install zinc-link        # 或 pipx install zinc-link
 zinc
 ```
 
-找不到 cloudflared？設環境變數 `ZINC_CLOUDFLARED=/path/to/cloudflared`，或到 `k` 設定裡填路徑。
-安裝 cloudflared 即表示你接受 Cloudflare 的授權與條款。
+### 方式 2：獨立執行檔（不需 Python）
 
-**沒裝 Python？** 到 [Releases](../../releases) 下載 Windows／macOS／Linux 的單一執行檔
-（由 `.github/workflows/ci.yml` 自動打包），一樣需要先裝 cloudflared。
+到 [Releases](../../releases) 下載你 OS 的單一執行檔，一樣需要先裝 cloudflared。
+
+- **Windows**：`zinc-windows-x64.exe`
+- **macOS（Apple Silicon）**：`zinc-macos-arm64`
+- **Linux（x86_64）**：`zinc-linux-x64`
+
 執行檔沒有簽章：Windows SmartScreen 會說「未知的發行者」（更多資訊 → 仍要執行）；macOS 先執行
 `xattr -d com.apple.quarantine ./zinc-macos-arm64`；Linux／macOS 要先 `chmod +x`。每個 Release 都附 SHA-256 清單
-（`SHA256SUMS.txt`），公開儲存庫還會附建置來源證明（`gh attestation verify <檔案> --repo <擁有者>/<儲存庫>`）。
+（`SHA256SUMS.txt`）。
+
+### 方式 3：Debian/Ubuntu（.deb）
+
+```bash
+wget https://github.com/zien0709/zinc/releases/download/v0.1.1/zinc_0.1.1_amd64.deb
+sudo dpkg -i zinc_0.1.1_amd64.deb
+zinc
+```
+
+### 方式 4：winget（Windows）
+
+```powershell
+winget install zien0709.zinc
+```
+
+找不到 cloudflared？設環境變數 `ZINC_CLOUDFLARED=/path/to/cloudflared`，或到 `k` 設定裡填路徑。
+安裝 cloudflared 即表示你接受 Cloudflare 的授權與條款。
 
 ## 使用
 

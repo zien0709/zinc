@@ -36,6 +36,8 @@ gets a plain 404, exactly as if nothing lived there.
 
 You need **Python 3.10 or newer** and **cloudflared**.
 
+### Option 1: pip (PyPI)
+
 ```bash
 # 1) cloudflared (the Cloudflare tunnel client)
 #    macOS:   brew install cloudflared
@@ -47,15 +49,35 @@ pip install zinc-link          # or:  pipx install zinc-link
 zinc
 ```
 
-Not on PATH? `export ZINC_CLOUDFLARED=/path/to/cloudflared` (or set it under `k` → Settings).
-Installing `cloudflared` means you accept Cloudflare's license and terms.
+### Option 2: Standalone binary (no Python needed)
 
-**No Python?** Download a single-file executable for Windows, macOS or Linux from the
-[Releases](../../releases) page (built by `.github/workflows/ci.yml`). You still need `cloudflared`.
+Download a single-file executable for Windows, macOS or Linux from the
+[Releases](../../releases) page. You still need `cloudflared`.
+
+- **Windows**: `zinc-windows-x64.exe`
+- **macOS (Apple Silicon)**: `zinc-macos-arm64`
+- **Linux (x86_64)**: `zinc-linux-x64`
+
 The executables are unsigned: Windows SmartScreen says "unknown publisher" (More info → Run anyway); on macOS run
 `xattr -d com.apple.quarantine ./zinc-macos-arm64`; on Linux/macOS `chmod +x` it first. Each release lists SHA-256
-checksums (`SHA256SUMS.txt`), and on a public repository also a signed build-provenance attestation
-(`gh attestation verify <file> --repo <owner>/<repo>`).
+checksums (`SHA256SUMS.txt`).
+
+### Option 3: Debian/Ubuntu (.deb)
+
+```bash
+wget https://github.com/zien0709/zinc/releases/download/v0.1.1/zinc_0.1.1_amd64.deb
+sudo dpkg -i zinc_0.1.1_amd64.deb
+zinc
+```
+
+### Option 4: winget (Windows)
+
+```powershell
+winget install zien0709.zinc
+```
+
+Not on PATH? `export ZINC_CLOUDFLARED=/path/to/cloudflared` (or set it under `k` → Settings).
+Installing `cloudflared` means you accept Cloudflare's license and terms.
 
 ### Run from a checkout
 
