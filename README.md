@@ -66,7 +66,7 @@ checksums (`SHA256SUMS.txt`).
 
 ```bash
 wget https://github.com/zien0709/zinc/releases/download/v0.1.2/zinc_0.1.2_amd64.deb
-sudo dpkg -i zinc_0.1.1_amd64.deb
+sudo dpkg -i zinc_0.1.2_amd64.deb
 zinc
 ```
 
@@ -177,7 +177,7 @@ One workflow; `tools/ci_plan.py` decides what runs.
 | Trigger | What happens |
 |---|---|
 | push to `main`, pull request | cheap: tests on Linux, Python 3.10 and 3.13 |
-| push a tag `v*` (`git tag v0.1.0 && git push --tags`) | **everything** (below), ending in a **draft** GitHub release |
+| push a tag `v*` (`git tag v0.1.2 && git push --tags`) | **everything** (below), ending in a **draft** GitHub release |
 | *Actions → Run workflow* | only what you tick; result is a downloadable `release-bundle` artifact |
 
 A release run does: tests on Python 3.10–3.13 + Windows + macOS + the *oldest* dependency versions pyproject allows
