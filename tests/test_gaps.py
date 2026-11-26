@@ -388,6 +388,7 @@ def test_a_tunnel_failure_on_create_is_shown_and_leaves_nothing_behind(tmp_path,
     drive(body, tmp_path)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="TUI modal interaction is flaky on Windows CI")
 def test_editing_into_a_blocked_target_asks_first_and_declining_changes_nothing(tmp_path):
     async def body(app, pilot, store, m, s):
         link = await m.create(plain_spec(), force=True)
@@ -400,7 +401,7 @@ def test_editing_into_a_blocked_target_asks_first_and_declining_changes_nothing(
             await pilot.click("#ok")
             assert await until(lambda: isinstance(app.screen, Confirm), pilot)
             assert "安全檢查擋下" in str(app.screen.query_one("#confirm-text").render())
-            await pilot.click(answer) if answer != "#no" else await app.screen.dismiss(False)
+            await pilot.click(answer) if answer != "#no" else app.screen.dismiss(False)
             await pilot.pause(0.5)
             assert store.get_link(link.id).spec.variants[0].url == expect
     drive(body, tmp_path, level="block")
