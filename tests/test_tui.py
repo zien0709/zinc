@@ -110,7 +110,7 @@ def test_form_validation_keeps_dialog_open(tmp_path):
     drive(t, tmp_path)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="TUI modal interaction is flaky on Windows CI; covered by the callback logic and Linux/macOS runs")
+@pytest.mark.skipif(os.name == "nt", reason="TUI modal interaction is flaky on Windows CI; covered by the callback logic and Linux/macOS runs")
 def test_blocked_target_asks_then_creates_only_when_confirmed(tmp_path):
     async def t(app, pilot, store, *_):
         await pilot.press("n")
