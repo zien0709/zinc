@@ -21,8 +21,8 @@ from typing import Callable, Optional
 
 
 def run(cmd: list[str], args: list[str], env: dict[str, str], timeout: float = 120.0) -> subprocess.CompletedProcess:
-    return subprocess.run([*cmd, *args], env=env, capture_output=True, text=True, timeout=timeout,
-                          stdin=subprocess.DEVNULL)
+    return subprocess.run([*cmd, *args], env=env, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout, stdin=subprocess.DEVNULL)
 
 
 def step_version(cmd, env, _tmp):
@@ -34,7 +34,10 @@ def step_version(cmd, env, _tmp):
 def step_help_settings(cmd, env, _tmp):
     basic, expert = run(cmd, ["--help-settings", "basic"], env), run(cmd, ["--help-settings", "expert"], env)
     ok = basic.returncode == 0 == expert.returncode and 5 < len(basic.stdout) < len(expert.stdout)
-    return ok, f"basic {len(basic.stdout.splitlines())} lines, expert {len(expert.stdout.splitlines())} lines"
+    detail = f"basic {len(basic.stdout.splitlines())} lines, expert {len(expert.stdout.splitlines())} lines"
+    if not ok and (basic.stderr or expert.stderr):
+        detail += " | stderr: " + (basic.stderr or expert.stderr).strip()[:200]
+    return ok, detail
 
 
 def step_config_path(cmd, env, tmp):
@@ -139,6 +142,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not cmd:
         ap.error("give the command to test after --")
     result = run_steps(cmd, skip=("tui-start-and-quit",) if args.no_tui else ())
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
     for s in result["steps"]:
         mark = {"passed": "✅", "failed": "❌", "skipped": "⏭"}[s["status"]]
         print(f"{mark} {s['name']:<20} {s['seconds']:>5}s  {s['detail']}")

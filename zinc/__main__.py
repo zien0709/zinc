@@ -18,7 +18,18 @@ def main(argv=None) -> None:
     ap.add_argument("--version", action="version", version=f"zinc {__version__}")
     args = ap.parse_args(argv)
     if args.help_settings:
-        print(help_all(args.help_settings))
+        try:
+            text = help_all(args.help_settings)
+        except Exception as e:  # pragma: no cover - defensive for frozen builds
+            import sys as _sys
+            _sys.stderr.write(f"help_all({args.help_settings!r}) raised: {e!r}\n")
+            text = f"help-settings unavailable for {args.help_settings}"
+        # Write UTF-8 bytes directly: a frozen Windows build's sys.stdout may be
+        # cp950 even with PYTHONUTF8=1, which makes print() emit undecodable bytes
+        # and lets the smoke test's UTF-8 decode fail with 0 captured lines.
+        import sys as _sys
+        _sys.stdout.buffer.write(text.encode("utf-8", errors="replace") + b"\n")
+        _sys.stdout.buffer.flush()
         return
     if args.config_path:
         print(config_path())
