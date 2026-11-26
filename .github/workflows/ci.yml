@@ -473,6 +473,11 @@ jobs:
         with:
           name: release-bundle
           path: bundle
+      - name: Build the Debian package from the Linux binary
+        run: |
+          chmod +x packaging/deb/build-deb.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          packaging/deb/build-deb.sh bundle/dist-zinc-linux-x64/zinc-linux-x64 "$VERSION" amd64 "release/zinc_${VERSION}_amd64.deb"
       - name: Create (or refresh) the DRAFT release
         env:
           GH_TOKEN: ${{ github.token }}
