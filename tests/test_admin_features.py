@@ -168,7 +168,9 @@ def test_export_key_uses_the_export_dir_setting_and_falls_back_to_the_working_fo
         await pilot.pause(0.3)
         assert (tmp_path / "custom" / "exports" / f"zinc-{link.id}-summary.json").exists()
         assert any("已匯出" in m and "custom" in m for m in notes(app))
-        s.export_dir = "/proc/definitely/not/writable"
+        blocker = tmp_path / "not-a-folder"                                       # a file where a folder is needed: unwritable on every OS
+        blocker.write_text("x")
+        s.export_dir = str(blocker / "exports")
         await pilot.press("x")
         await pilot.pause(0.3)
         assert any("匯出失敗" in m for m in notes(app))

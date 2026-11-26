@@ -309,8 +309,8 @@ def run_cli(*args, env=None):
 def test_cli_prints_the_version_the_config_path_and_the_settings_help(tmp_path):
     v = run_cli("--version")
     assert v.returncode == 0 and v.stdout.strip().startswith("zinc ")
-    c = run_cli("--config-path", env={"XDG_CONFIG_HOME": str(tmp_path)})
-    assert c.stdout.strip() == str(tmp_path / "zinc" / "config.json")
+    c = run_cli("--config-path", env={"XDG_CONFIG_HOME": str(tmp_path), "APPDATA": str(tmp_path)})
+    assert c.stdout.strip() == str(tmp_path / "zinc" / "config.json")            # XDG on POSIX, APPDATA on Windows
     basic, expert = run_cli("--help-settings", "basic"), run_cli("--help-settings")
     assert basic.returncode == expert.returncode == 0
     assert 0 < len(basic.stdout) < len(expert.stdout)

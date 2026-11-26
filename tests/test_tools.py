@@ -174,7 +174,8 @@ def test_folder_builds_are_zipped_under_one_folder_keeping_the_executable_bit(tm
     build_binary.zip_folder(folder, tmp_path / "out" / "zinc.zip")
     with zipfile.ZipFile(tmp_path / "out" / "zinc.zip") as z:
         assert sorted(z.namelist()) == ["zinc/lib/x.bin", "zinc/zinc"]
-        assert stat.S_IMODE(z.getinfo("zinc/zinc").external_attr >> 16) & 0o111
+        if os.name != "nt":                    # NTFS has no executable bit, so a Windows build cannot carry one
+            assert stat.S_IMODE(z.getinfo("zinc/zinc").external_attr >> 16) & 0o111
 
 
 def test_names_must_agree_with_the_build_mode(tmp_path):
@@ -412,9 +413,10 @@ def test_the_report_tells_github_whether_the_release_is_ready(tmp_path, monkeypa
         monkeypatch.setenv("GITHUB_OUTPUT", str(out))
         assert report.main(["--reports", str(reports), "--assets", str(assets), "--plan", str(reports / "plan.json"),
                             "--out", str(d / "REPORT.md"), "--sums", str(d / "SUMS")]) == 0
-        lines = out.read_text().splitlines()
+        text = out.read_text(encoding="utf-8")     # report.py writes $GITHUB_OUTPUT as UTF-8, never the locale's codec
+        lines = text.splitlines()
         assert expect in lines and any(l.startswith("overall=") for l in lines)
-        assert ("NOT READY" in out.read_text()) == broken
+        assert ("NOT READY" in text) == broken
 
 
 def sub(tmp_path, name):
