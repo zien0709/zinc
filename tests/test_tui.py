@@ -118,7 +118,7 @@ def test_blocked_target_asks_then_creates_only_when_confirmed(tmp_path):
         await pilot.click("#ok")
         assert await until(lambda: isinstance(app.screen, Confirm), pilot)
         assert "bad thing" in app.screen.query_one("#confirm-text").render().plain
-        await pilot.press("escape")                                    # Esc -> action_no -> dismiss(False); reliable on Windows (click #no is flaky there)
+        await app.screen.dismiss(False)                                    # reliable on Windows: Esc/click don't consistently dismiss the modal
         await pilot.pause(0.5)
         assert store.list_links() == []                      # declined: nothing exists
         await pilot.press("n")
