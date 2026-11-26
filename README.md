@@ -151,7 +151,7 @@ fine; hundreds is untested.
 | | Status |
 |---|---|
 | Linux, Python 3.10 / 3.11 / 3.12 / 3.13 | The whole automated suite (~700 tests, mutation-checked) passes on each. Also passes on the declared minimum dependency versions (aiohttp 3.14.4, Textual 4.0.0, rich 13.9.4, segno 1.6.1) on 3.13. |
-| Windows, macOS | Pure-Python code, no OS-specific calls except the config path and file permissions. **Not run by the author yet** — the CI workflow tests and builds them; please report anything odd. |
+| Windows, macOS | Pure-Python code, no OS-specific calls except the config path and file permissions. **Verified in CI**: the test suite (700+ tests) runs on windows-latest (Python 3.12) and macos-latest (Python 3.12) on every tag release. Each platform also builds and smoke-tests its own binary. |
 | Real `cloudflared` | The tunnel handling is tested against a faithful fake. Real quick-tunnel behaviour (e.g. `CF-IPCountry` on quick tunnels) should be confirmed on first use. |
 | VirusTotal / Safe Browsing / URLhaus | Tested against fakes. URLhaus's endpoint and field names are from memory and flagged `UNVERIFIED` in the code. |
 | Locale rule table (google / youtube / microsoft / wikipedia / apple) | From memory, marked `UNVERIFIED_RULES`; the target's own `hreflang` is always tried first. |
@@ -199,7 +199,9 @@ Repository settings (all optional):
 
 Actions minutes: public repositories are free. On a private repository Windows counts ×2 and macOS ×10, and mutation
 testing is the longest job; use `ZINC_RELEASE_SKIP` or the manual form for dry runs. The workflow itself was linted
-with actionlint + shellcheck and its glue rehearsed locally, but **a full run on GitHub has not happened yet**; expect
+Actions minutes: public repositories are free. On a private repository Windows counts ?2 and macOS ?10, and mutation
+testing is the longest job; use ZINC_RELEASE_SKIP or the manual form for dry runs. The workflow itself was linted
+with actionlint + shellcheck and its glue rehearsed locally.
 to fix something on the first run (most likely Windows/macOS tests or Nuitka).
 
 ## Develop

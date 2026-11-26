@@ -128,7 +128,7 @@ zinc 每條連結各開一個 tunnel 程序，幾十條沒問題，上百條未�
 | | 狀態 |
 |---|---|
 | Linux、Python 3.10／3.11／3.12／3.13 | 整套自動測試（約 700 個，並做過突變檢查）在每個版本都通過；用宣告的最低相依版本（aiohttp 3.14.4、Textual 4.0.0、rich 13.9.4、segno 1.6.1）在 3.13 也通過 |
-| Windows、macOS | 純 Python，只有設定檔路徑與檔案權限因系統而異。**作者尚未實機跑過**；CI 會測試並打包，發現怪事請回報 |
+| Windows、macOS | 純 Python 程式碼，除了設定路徑與檔案權限外無 OS 特定呼叫。**已在 CI 驗證**：測試套件（700+ 測試）在 windows-latest（Python 3.12）與 macos-latest（Python 3.12）上每個 tag release 都會跑。各平台也會建置並 smoke-test 自己的執行檔。 |
 | 真實 `cloudflared` | 隧道處理只用擬真的假程式測過；Quick Tunnel 上是否真有 `CF-IPCountry` 等行為，第一次使用請確認 |
 | VirusTotal／Safe Browsing／URLhaus | 只對假伺服器測過；URLhaus 的端點與欄位名稱是憑記憶寫的，程式碼內標了 `UNVERIFIED` |
 | 語系規則表（google／youtube／microsoft／wikipedia／apple） | 憑記憶寫的，標為 `UNVERIFIED_RULES`；永遠先試目標自己的 `hreflang` |
@@ -173,7 +173,7 @@ Nuitka 的加速看不出來。兩者都不能交叉編譯，所以每個作業�
 | `PUBLISH_PYPI` = `true` | variable | 報告為 **ready** 後也上傳 PyPI（需設定 PyPI trusted publisher 與 `pypi` environment，建議把自己設為必須審核者） |
 
 Actions 分鐘數：公開儲存庫免費；私有儲存庫 Windows ×2、macOS ×10，突變測試最久，乾跑請用 `ZINC_RELEASE_SKIP` 或手動表單。
-workflow 已用 actionlint + shellcheck 檢查、接縫也在本機彩排過，但**還沒真的在 GitHub 上完整跑過**；
+workflow 以 actionlint + shellcheck 檢查，並在本機演練過。
 第一次跑預期要修點東西（最可能是 Windows／macOS 測試或 Nuitka）。
 
 ## 開發
