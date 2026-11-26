@@ -1,0 +1,519 @@
+name: zinc CI and release
+
+# One workflow, three behaviours. tools/ci_plan.py decides which (it is plain Python with its own tests):
+#
+#   push to main / pull request  ->  cheap: the test job only (Linux, Python 3.10 and 3.13)
+#   push of a tag  v*            ->  EVERYTHING: tests on 4 Pythons + Windows + macOS + oldest dependencies,
+#                                    mutation testing, real cloudflared check, security scans, wheel + sdist,
+#                                    PyInstaller and Nuitka executables on every OS, one REPORT.md,
+#                                    and a DRAFT GitHub release holding all of it. You press "Publish" yourself.
+#   "Run workflow" button        ->  only what you tick; the result is a downloadable "release-bundle" artifact
+#
+# Settings you may add in the repository (Settings > Secrets and variables > Actions); everything is optional:
+#   secrets   ZINC_VT_KEY  ZINC_GSB_KEY  ZINC_URLHAUS_KEY  ZINC_WEBHOOK_URL    -> the real-world check uses them
+#   variables ZINC_RELEASE_SKIP   e.g.  mutation,macos   (leave things out to save Actions minutes; see ci_plan.py)
+#             ZINC_WEBHOOK_FORMAT discord | slack | generic
+#             PUBLISH_PYPI        true  -> also upload to PyPI (needs a PyPI "trusted publisher" and the `pypi` environment)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    paths-ignore: ["**.md", "LICENSE"]
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which operating systems (macOS minutes cost 10x on a private repository)"
+        type: choice
+        options: [linux, linux+windows, all]
+        default: linux
+      tests:
+        description: "min = Python 3.10 + 3.13;  full = 3.10-3.13 and the oldest dependencies"
+        type: choice
+        options: [min, full]
+        default: min
+      pyinstaller:
+        description: "Build PyInstaller executables (the verified recipe)"
+        type: boolean
+        default: true
+      nuitka:
+        description: "Build Nuitka executables (experimental, slow)"
+        type: boolean
+        default: false
+      mutation:
+        description: "Run mutation testing (slow)"
+        type: boolean
+        default: false
+      live:
+        description: "Run the real cloudflared / provider check"
+        type: boolean
+        default: true
+      extra_arm:
+        description: "Also build for Linux arm64 (experimental)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  PYTHONUTF8: "1"                 # Windows consoles default to a legacy encoding that cannot print the report's emoji
+  PYTHONIOENCODING: utf-8
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INPUT: "1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ------------------------------------------------------------------------------------------------------------
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      test_matrix: ${{ steps.plan.outputs.test_matrix }}
+      build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      has_builds: ${{ steps.plan.outputs.has_builds }}
+      run_mutation: ${{ steps.plan.outputs.run_mutation }}
+      run_live: ${{ steps.plan.outputs.run_live }}
+      run_security: ${{ steps.plan.outputs.run_security }}
+      run_package: ${{ steps.plan.outputs.run_package }}
+      run_release: ${{ steps.plan.outputs.run_release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Decide what to run
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PLATFORMS: ${{ inputs.platforms }}
+          TESTS: ${{ inputs.tests }}
+          PYINSTALLER: ${{ inputs.pyinstaller }}
+          NUITKA: ${{ inputs.nuitka }}
+          MUTATION: ${{ inputs.mutation }}
+          LIVE: ${{ inputs.live }}
+          EXTRA_ARM: ${{ inputs.extra_arm }}
+          SKIP: ${{ vars.ZINC_RELEASE_SKIP }}
+          PLAN_JSON: reports/plan.json
+        run: |
+          mkdir -p reports
+          python tools/ci_plan.py
+          { echo '### What this run will do'; echo '```json'; cat reports/plan.json; echo; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: reports-plan
+          path: reports/plan.json
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  test:
+    name: tests (${{ matrix.label }}, py${{ matrix.python }})
+    needs: plan
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.test_matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install zinc and the test tools
+        if: ${{ !matrix.floor }}
+        run: python -m pip install -e ".[dev]"
+      - name: Install the OLDEST dependency versions pyproject allows, and audit them
+        if: ${{ matrix.floor }}
+        run: |
+          mkdir -p reports
+          python tools/floor_requirements.py | tee floor.txt
+          python -m venv .floor
+          .floor/bin/python -m pip install -r floor.txt
+          python -m pip install pip-audit
+          pip-audit -f json -o reports/pip-audit-floor.json --progress-spinner off \
+            --path "$(.floor/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" || true
+          .floor/bin/python -m pip install -e . --no-deps
+          .floor/bin/python -m pip install "pytest>=8" "pillow>=10" "zxing-cpp>=2" "pyyaml>=6"
+      - name: Run the tests
+        env:
+          LABEL: ${{ matrix.label }}
+          PYV: ${{ matrix.python }}
+          COV: ${{ matrix.cov }}
+          FLOOR: ${{ matrix.floor }}
+        run: |
+          mkdir -p reports
+          PY=python
+          if [ "$FLOOR" = "true" ]; then PY=.floor/bin/python; fi
+          if [ "$COV" = "true" ]; then
+            "$PY" -m coverage run --branch --source=zinc -m pytest -p no:cacheprovider --junitxml="reports/junit-$LABEL-$PYV.xml"
+          else
+            "$PY" -m pytest -p no:cacheprovider --junitxml="reports/junit-$LABEL-$PYV.xml"
+          fi
+      - name: Coverage report
+        if: ${{ always() && matrix.cov }}
+        run: |
+          python -m coverage json -o reports/coverage.json
+          python -m coverage report --skip-empty | tail -n 40
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-test-${{ matrix.label }}-${{ matrix.python }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  mutation:
+    name: mutation testing
+    needs: plan
+    if: ${{ needs.plan.outputs.run_mutation == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - name: Break the code on purpose, one change at a time
+        # Survivors do not fail the job: they are reported (as warnings) in REPORT.md.
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          MUTATE_JOBS="$(nproc)" python tools/mutate.py --report reports/mutation.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-mutation
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  live:
+    name: real cloudflared check
+    needs: plan
+    if: ${{ needs.plan.outputs.run_live == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e .
+      - name: Install cloudflared (Cloudflare's own apt repository)
+        run: |
+          sudo mkdir -p --mode=0755 /usr/share/keyrings
+          curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+          echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+          sudo apt-get update
+          sudo apt-get install -y cloudflared
+          cloudflared --version
+      - name: Check zinc against the real world (a failure is a warning in the report, not a red job)
+        continue-on-error: true
+        env:
+          ZINC_VT_KEY: ${{ secrets.ZINC_VT_KEY }}
+          ZINC_GSB_KEY: ${{ secrets.ZINC_GSB_KEY }}
+          ZINC_URLHAUS_KEY: ${{ secrets.ZINC_URLHAUS_KEY }}
+          ZINC_WEBHOOK_URL: ${{ secrets.ZINC_WEBHOOK_URL }}
+          ZINC_WEBHOOK_FORMAT: ${{ vars.ZINC_WEBHOOK_FORMAT }}
+        run: |
+          mkdir -p reports
+          python tools/live_check.py --json reports/live-check.json --links 3
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-live
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  security:
+    name: security scans
+    needs: plan
+    if: ${{ needs.plan.outputs.run_security == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Install what a user would get, in a clean environment, plus the scanners
+        run: |
+          python -m venv .audit-env
+          .audit-env/bin/python -m pip install .
+          python -m pip install bandit pip-audit cyclonedx-bom vermin
+      - name: Scan
+        # Findings do not fail the job: they are listed (as warnings) in REPORT.md.
+        run: |
+          mkdir -p reports sbom
+          bandit -r zinc -f json -o reports/bandit.json -q || true
+          pip-audit -f json -o reports/pip-audit.json --progress-spinner off \
+            --path "$(.audit-env/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" || true
+          vermin --no-tips -t=3.10- zinc | tee reports/vermin.txt || true
+          cyclonedx-py environment --of JSON -o sbom/sbom.cdx.json --pyproject pyproject.toml .audit-env/bin/python
+          cp sbom/sbom.cdx.json reports/sbom.cdx.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-security
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dist-sbom
+          path: sbom/sbom.cdx.json
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  package:
+    name: wheel and sdist
+    needs: plan
+    if: ${{ needs.plan.outputs.run_package == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Build, check, install into a clean environment, smoke-test what was installed
+        run: |
+          python -m pip install build twine
+          python -m build --outdir dist
+          twine check --strict dist/*
+          python -m venv .wheel-test
+          .wheel-test/bin/python -m pip install dist/*.whl
+          mkdir -p reports
+          python tools/smoke.py --json reports/smoke-wheel.json -- .wheel-test/bin/zinc
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-package
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dist-package
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  binaries:
+    name: ${{ matrix.name }}
+    needs: plan
+    if: ${{ needs.plan.outputs.has_builds == 'true' }}
+    runs-on: ${{ matrix.os }}
+    # Nuitka and Linux-arm builds are experimental: they may fail without failing the run (REPORT.md says so).
+    continue-on-error: ${{ matrix.experimental }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.build_matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: "Linux only: what Nuitka needs to make a standalone program"
+        if: ${{ matrix.tool == 'nuitka' && runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+      - name: Install zinc (with the optional offline-geo module) and the build tool
+        env:
+          TOOL: ${{ matrix.tool }}
+        run: |
+          python -m pip install ".[geo]"
+          if [ "$TOOL" = "nuitka" ]; then
+            python -m pip install "nuitka==4.3.5" ordered-set zstandard
+          else
+            python -m pip install pyinstaller
+          fi
+      - name: Build
+        id: build
+        env:
+          TOOL: ${{ matrix.tool }}
+          MODE: ${{ matrix.mode }}
+          NAME: ${{ matrix.name }}
+        run: python tools/build_binary.py --tool "$TOOL" --mode "$MODE" --name "$NAME"
+      - name: Smoke-test the program that was just built
+        if: ${{ steps.build.outcome == 'success' }}
+        env:
+          NAME: ${{ matrix.name }}
+          EXE: ${{ steps.build.outputs.exe }}
+          NO_TUI: ${{ runner.os == 'Windows' }}        # Windows has no pty, so the UI step is skipped there (and reported as skipped)
+        run: |
+          args=()
+          if [ "$NO_TUI" = "true" ]; then args+=(--no-tui); fi
+          python tools/smoke.py --json "reports/smoke-$NAME.json" "${args[@]}" -- "$EXE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() }}
+        with:
+          name: reports-build-${{ matrix.name }}
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 30
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ steps.build.outcome == 'success' }}
+        with:
+          name: dist-${{ matrix.name }}
+          path: dist/${{ matrix.name }}
+          retention-days: 30
+
+  # ------------------------------------------------------------------------------------------------------------
+  report:
+    name: report and bundle
+    needs: [plan, test, mutation, live, security, package, binaries]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write           # build-provenance attestation
+      attestations: write
+    outputs:
+      ready: ${{ steps.report.outputs.ready }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: bundle
+      - name: Sort everything the jobs uploaded into reports/ and assets/
+        run: |
+          python tools/assemble.py --bundle bundle --reports reports --assets assets
+          (cd reports && zip -qr ../assets/zinc-reports.zip .)
+      - name: Attest where each file came from (public repositories only)
+        id: attest
+        if: ${{ needs.plan.outputs.run_release == 'true' && github.event.repository.private == false }}
+        continue-on-error: true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: assets/*
+      - name: Write REPORT.md and SHA256SUMS.txt
+        id: report
+        env:
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ATTESTED: ${{ steps.attest.outcome == 'success' }}
+        run: |
+          args=()
+          if [ "$ATTESTED" = "true" ]; then args+=(--attested); fi
+          python tools/report.py --reports reports --assets assets --plan reports/plan.json \
+            --out REPORT.md --sums SHA256SUMS.txt --tag "$TAG" --sha "$SHA" --repo "$REPO" --run-url "$RUN_URL" "${args[@]}"
+          head -c 900000 REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p release
+          cp assets/* REPORT.md SHA256SUMS.txt release/
+          ls -la release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-bundle
+          path: release/
+          retention-days: 90
+
+  # ------------------------------------------------------------------------------------------------------------
+  release:
+    name: draft GitHub release
+    needs: [plan, report]
+    if: ${{ !cancelled() && needs.plan.outputs.run_release == 'true' && needs.report.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-bundle
+          path: bundle
+      - name: Create (or refresh) the DRAFT release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          OVERALL: ${{ needs.report.outputs.ready == 'true' && 'ready' || 'NOT READY, read the report' }}
+        run: |
+          mkdir -p release
+          find bundle -type f -exec cp {} release/ \;
+          head -c 120000 release/REPORT.md > notes.md
+          flags=(--draft --title "zinc $TAG ($OVERALL)" --notes-file notes.md)
+          if [[ "$TAG" == *-* ]]; then flags+=(--prerelease); fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" "${flags[@]}"
+            gh release upload "$TAG" release/* --clobber
+          else
+            gh release create "$TAG" --verify-tag "${flags[@]}" release/*
+          fi
+          echo "Draft release created: $GITHUB_SERVER_URL/$GH_REPO/releases" >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------------------------
+  pypi:
+    name: publish to PyPI
+    needs: [plan, report, package]
+    # Irreversible, so: only for a tag, only when you switched it on, and only when the report says READY.
+    if: ${{ !cancelled() && needs.plan.outputs.run_release == 'true' && vars.PUBLISH_PYPI == 'true' && needs.report.outputs.ready == 'true' && needs.package.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write           # PyPI "trusted publishing": no API token is stored anywhere
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: dist-package
+          path: bundle
+      - name: Put the wheel and sdist side by side
+        run: |
+          mkdir -p pypi-dist
+          find bundle -type f \( -name '*.whl' -o -name '*.tar.gz' \) -exec cp {} pypi-dist/ \;
+          ls -la pypi-dist
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1 (v1.14.3)
+        with:
+          packages-dir: pypi-dist
