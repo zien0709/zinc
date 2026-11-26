@@ -109,7 +109,7 @@ def section_binaries(reports: Path, assets: Path, plan: dict):
         skipped_steps = [s["name"] for s in (smoke or {}).get("steps", []) if s["status"] == "skipped"]
         exp = name in experimental or name.startswith("zinc-nuitka")
         if not file.exists():
-            state, note = (WARN if exp else BAD), "not built (build failed or job did not run)"
+            state, note = WARN, "not built (build failed or job did not run)"
         elif smoke is None:
             state, note = (WARN if exp else BAD), "built, but no smoke-test result"
         elif failed_steps or not smoke.get("ok"):

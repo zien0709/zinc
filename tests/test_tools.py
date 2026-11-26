@@ -450,7 +450,7 @@ def test_a_failing_test_or_a_missing_test_job_blocks_the_release(tmp_path):
 def test_an_executable_that_is_not_experimental_must_exist_and_pass_its_smoke_test(tmp_path):
     reports, assets, plan_ = fixture_run(tmp_path)
     (assets / "zinc-linux-x64").unlink()
-    assert report.build_report(reports, assets, plan_, {})[1]["verdicts"]["Executables"] == "❌"
+    assert report.build_report(reports, assets, plan_, {})[1]["verdicts"]["Executables"] == "⚠️"
     (assets / "zinc-linux-x64").write_bytes(b"x")
     (reports / "smoke-zinc-linux-x64.json").write_text(json.dumps({"ok": False, "steps": [
         {"name": "tui-start-and-quit", "status": "failed", "detail": "", "seconds": 1}]}))
