@@ -150,7 +150,7 @@ jobs:
           pip-audit -f json -o reports/pip-audit-floor.json --progress-spinner off \
             --path "$(.floor/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" || true
           .floor/bin/python -m pip install -e . --no-deps
-          .floor/bin/python -m pip install "pytest>=8" "pillow>=10" "zxing-cpp>=2" "pyyaml>=6"
+          .floor/bin/python -m pip install "pytest>=8" "pillow>=10" "zxing-cpp>=2,<3.2" "pyyaml>=6"
       - name: Run the tests
         env:
           LABEL: ${{ matrix.label }}
