@@ -54,7 +54,7 @@ zinc
 ### 方式 3：Debian/Ubuntu（.deb）
 
 ```bash
-wget https://github.com/zien0709/zinc/releases/download/v0.1.1/zinc_0.1.1_amd64.deb
+wget https://github.com/zien0709/zinc/releases/download/v0.1.2/zinc_0.1.2_amd64.deb
 sudo dpkg -i zinc_0.1.1_amd64.deb
 zinc
 ```

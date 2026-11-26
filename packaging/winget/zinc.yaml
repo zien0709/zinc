@@ -4,7 +4,7 @@
 # Docs: https://learn.microsoft.com/en-us/windows/package-manager/package/manifest
 
 PackageIdentifier: zien0709.zinc
-PackageVersion: 0.1.1
+PackageVersion: 0.1.2
 PackageLocale: en-US
 Publisher: zinc contributors
 PublisherUrl: https://github.com/zien0709/zinc
@@ -31,7 +31,7 @@ ManifestVersion: 1.6.0
 Installers:
   - Architecture: x64
     InstallerType: portable
-    InstallerUrl: https://github.com/zien0709/zinc/releases/download/v0.1.1/zinc-windows-x64.exe
+    InstallerUrl: https://github.com/zien0709/zinc/releases/download/v0.1.2/zinc-windows-x64.exe
     InstallerSha256: fdc35f90963b41ff81fd5bd6507d8302491425a6c5471c113d6b2d8caf59318d
     Commands:
       - zinc
