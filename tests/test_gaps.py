@@ -400,7 +400,7 @@ def test_editing_into_a_blocked_target_asks_first_and_declining_changes_nothing(
             await pilot.click("#ok")
             assert await until(lambda: isinstance(app.screen, Confirm), pilot)
             assert "安全檢查擋下" in str(app.screen.query_one("#confirm-text").render())
-            await pilot.click(answer)
+            await pilot.click(answer) if answer != "#no" else await pilot.press("escape")
             await pilot.pause(0.5)
             assert store.get_link(link.id).spec.variants[0].url == expect
     drive(body, tmp_path, level="block")
