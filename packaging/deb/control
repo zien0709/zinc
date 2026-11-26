@@ -1,0 +1,14 @@
+Package: zinc
+Version: 0.1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Maintainer: zinc contributors <zien0709@gmail.com>
+Description: A free, self-hosted long-URL generator on Cloudflare Quick Tunnels
+ zinc turns any link into a short, secret URL on a Cloudflare Quick Tunnel
+ and gives you a terminal dashboard to see who opened it, change where it
+ goes, and destroy it. No account, no server, no domain required.
+ .
+ zinc is a single statically-linked binary; no Python or dependencies needed.
+Homepage: https://github.com/zien0709/zinc
