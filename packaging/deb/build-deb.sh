@@ -9,6 +9,8 @@ VERSION="${2:?version required}"
 ARCH="${3:-amd64}"
 OUTPUT="${4:-zinc_${VERSION}_${ARCH}.deb}"
 
+mkdir -p "$(dirname "$OUTPUT")"
+
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
