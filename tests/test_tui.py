@@ -120,6 +120,7 @@ def test_blocked_target_asks_then_creates_only_when_confirmed(tmp_path):
         assert "bad thing" in app.screen.query_one("#confirm-text").render().plain
         await pilot.click("#no")
         await pilot.pause(0.5)
+        assert await until(lambda: not isinstance(app.screen, Confirm), pilot)   # Windows dismisses the modal a beat later
         assert store.list_links() == []                      # declined: nothing exists
         await pilot.press("n")
         await pilot.pause()
