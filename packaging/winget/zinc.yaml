@@ -11,7 +11,7 @@ PublisherUrl: https://github.com/zien0709/zinc
 PackageName: zinc
 PackageUrl: https://github.com/zien0709/zinc
 License: MIT
-LicenseUrl: https://github.com/zien0709/zinc/blob/main/LICENSE
+LicenseUrl: https://raw.githubusercontent.com/zien0709/zinc/main/LICENSE
 ShortDescription: A free, self-hosted long-URL generator on Cloudflare Quick Tunnels
 Description: |-
   zinc turns any link into a secret URL on a Cloudflare Quick Tunnel and gives
