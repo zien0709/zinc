@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>zinc - Free, self-hosted long-URL generator</title>
+  <meta name="description" content="zinc turns any link into a secret URL on a Cloudflare Quick Tunnel.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <span class="logo">zinc</span>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="#releases">Releases</a>
+        <a href="https://github.com/zien0709/zinc" target="_blank">GitHub</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <section class="hero">
+      <h1>zinc</h1>
+      <p class="subtitle">A free, self-hosted long-URL generator on Cloudflare Quick Tunnels.</p>
+      <p class="desc">Turn any link into a secret URL. See who opened it, change where it goes, destroy it. No account, no server, no domain.</p>
+      <div class="hero-buttons">
+        <a href="#install" class="btn btn-primary">Install</a>
+        <a href="https://github.com/zien0709/zinc/releases/latest" class="btn btn-secondary">Download</a>
+        <a href="https://github.com/zien0709/zinc" class="btn btn-secondary" target="_blank">GitHub</a>
+      </div>
+    </section>
+    <section id="features" class="features">
+      <h2>Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card"><h3>Gates</h3><p>plain, note, count, box, door</p></div>
+        <div class="feature-card"><h3>Routing</h3><p>A/B splits, by country, language, device</p></div>
+        <div class="feature-card"><h3>Adaptive locale</h3><p>Send visitors to localized page</p></div>
+        <div class="feature-card"><h3>Limits</h3><p>Lifetime, max visitors, password, start time</p></div>
+        <div class="feature-card"><h3>Dashboard</h3><p>Opens, uniques, passes, bots, sparkline, export</p></div>
+        <div class="feature-card"><h3>Safety</h3><p>Scanner, VirusTotal, Safe Browsing, URLhaus</p></div>
+      </div>
+    </section>
+    <section id="install" class="install">
+      <h2>Install</h2>
+      <p>pip install zinc-link</p>
+      <p>python -m zinc</p>
+      <p>Or download binary from Releases page.</p>
+      <p>Debian/Ubuntu: sudo dpkg -i zinc_0.1.2_amd64.deb</p>
+      <p>Windows: winget install zien0709.zinc</p>
+      <p>macOS: brew tap zien0709/tap && brew install zinc</p>
+      <p>Windows (Scoop): scoop bucket add zien0709 https://github.com/zien0709/scoop-bucket && scoop install zinc</p>
+    </section>
+    <section id="releases" class="releases">
+      <h2>Releases</h2>
+      <p><a href="https://github.com/zien0709/zinc/releases">View all releases on GitHub</a></p>
+    </section>
+  </main>
+  <footer>
+    <p>MIT License | <a href="https://github.com/zien0709/zinc">GitHub</a></p>
+  </footer>
+</body>
+</html>
